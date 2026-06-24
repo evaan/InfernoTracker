@@ -8,9 +8,22 @@ import net.runelite.client.config.ConfigItem;
 public interface InfernoTrackerConfig extends Config
 {
 	@ConfigItem(
-		keyName = "minWave",
-		name = "Minimum Wave",
-		description = "Choose the minimum wave to start logging inferno deaths"
+		keyName = "minInfernoWave",
+		name = "Minimum Inferno Wave",
+		description = "Choose the minimum Inferno wave to log deaths"
 	)
-	default int minWave() {return 1;}
+	default int minInfernoWave()
+	{
+		return 1;
+	}
+
+	@ConfigItem(
+		keyName = "minColosseumWave",
+		name = "Minimum Colosseum Wave",
+		description = "Choose the minimum Colosseum wave to log deaths"
+	)
+	default int minColosseumWave()
+	{
+		return 1;
+	}
 }
