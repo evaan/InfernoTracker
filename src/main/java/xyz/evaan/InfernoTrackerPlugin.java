@@ -10,6 +10,7 @@ import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ClientShutdown;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -73,8 +74,6 @@ public class InfernoTrackerPlugin extends Plugin
 		loadAttempts();
 		panel.update();
 
-		Runtime.getRuntime().addShutdownHook(new Thread(this::saveAttempts));
-
 		navButton = NavigationButton.builder()
 				.tooltip("Inferno Tracker")
 				.icon(ImageUtil.loadImageResource(getClass(), "/icon.png"))
@@ -91,6 +90,12 @@ public class InfernoTrackerPlugin extends Plugin
 	protected void shutDown() throws Exception
 	{
 		clientToolbar.removeNavigation(navButton);
+		saveAttempts();
+	}
+
+	@Subscribe
+	public void onClientShutdown(ClientShutdown event)
+	{
 		saveAttempts();
 	}
 
