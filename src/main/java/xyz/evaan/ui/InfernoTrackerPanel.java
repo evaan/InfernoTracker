@@ -69,6 +69,22 @@ public class InfernoTrackerPanel extends PluginPanel {
 		update();
 	}
 
+	public void addColosseumReward(int wave, String gpText) {
+		for (int i = colosseumAttempts.size() - 1; i >= 0; i--) {
+			Attempt attempt = colosseumAttempts.get(i);
+			if (attempt.result == Result.COMPLETION && attempt.wave == wave && attempt.status == null) {
+				colosseumAttempts.set(i, new Attempt(Activity.COLOSSEUM, Result.COMPLETION, wave, gpText));
+				update();
+				return;
+			}
+		}
+
+		if (shouldLog(Activity.COLOSSEUM, Result.COMPLETION, wave)) {
+			colosseumAttempts.add(new Attempt(Activity.COLOSSEUM, Result.COMPLETION, wave, gpText));
+		}
+		update();
+	}
+
 	public void addSavedAttempt(Attempt attempt) {
 		if (attempt != null) {
 			getAttempts(attempt.activity).add(attempt);
@@ -162,7 +178,7 @@ public class InfernoTrackerPanel extends PluginPanel {
 		for (Attempt attempt : attempts) {
 			String tooltip = attempt.getTooltip();
 			JLabel attemptLabel = centeredLabel(String.valueOf(row + 1));
-			JLabel resultLabel = centeredLabel(attempt.result.label);
+			JLabel resultLabel = centeredLabel(attempt.getStatusLabel());
 			JLabel waveLabel = centeredLabel(String.valueOf(attempt.wave));
 
 			attemptLabel.setToolTipText(tooltip);
@@ -216,14 +232,24 @@ public class InfernoTrackerPanel extends PluginPanel {
 		private final Activity activity;
 		private final Result result;
 		private final int wave;
+		private final String status;
 
 		public Attempt(Activity activity, Result result, int wave) {
+			this(activity, result, wave, null);
+		}
+
+		public Attempt(Activity activity, Result result, int wave, String status) {
 			this.activity = activity;
 			this.result = result;
 			this.wave = wave;
+			this.status = status;
 		}
 
 		public String toSaveLine() {
+			if (status != null) {
+				return "COMPLETE|" + wave + "|" + status;
+			}
+
 			if (result == Result.COMPLETION) {
 				return "COMPLETE";
 			}
@@ -231,7 +257,15 @@ public class InfernoTrackerPanel extends PluginPanel {
 			return String.valueOf(wave);
 		}
 
+		public String getStatusLabel() {
+			return status == null ? result.label : status;
+		}
+
 		public String getTooltip() {
+			if (status != null) {
+				return activity.label + " wave " + wave + " rewards: " + status;
+			}
+
 			if (result == Result.COMPLETION) {
 				return activity.label + " completion";
 			}
@@ -245,6 +279,11 @@ public class InfernoTrackerPanel extends PluginPanel {
 
 		public static Attempt fromSaveLine(String line, Activity expectedActivity) {
 			try {
+				String[] parts = line.split("\\|", 3);
+				if (parts.length == 3 && "COMPLETE".equals(parts[0])) {
+					return new Attempt(expectedActivity, Result.COMPLETION, Integer.parseInt(parts[1]), parts[2]);
+				}
+
 				if ("COMPLETE".equals(line)) {
 					return new Attempt(expectedActivity, Result.COMPLETION,
 							expectedActivity == Activity.INFERNO ? INFERNO_MAX_WAVE : COLOSSEUM_MAX_WAVE);
