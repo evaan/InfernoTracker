@@ -6,8 +6,10 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import net.runelite.api.events.ClientTick;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.ChatMessage;
+import net.runelite.api.widgets.Widget;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ClientShutdown;
@@ -42,10 +44,14 @@ public class InfernoTrackerPlugin extends Plugin
 	private static final int COLOSSEUM_REGION = 7216;
 	private static final int INFERNO_COMPLETION_WAVE = 69;
 	private static final int COLOSSEUM_COMPLETION_WAVE = 12;
+	private static final int COLOSSEUM_REWARD_WIDGET_GROUP = 864;
+	private static final int COLOSSEUM_REWARD_GP_WIDGET_CHILD = 18;
 
 	private static final Pattern WAVE_PATTERN = Pattern.compile(".*Wave:?\\s*(\\d+).*");
 	private static final Pattern INFERNO_COMPLETION_PATTERN = Pattern.compile(".*Your TzKal-Zuk kill count is: \\d+\\..*");
 	private static final String COLOSSEUM_COMPLETION_MESSAGE = "Wave 12 completed!";
+	private static final String COLOSSEUM_REWARD_MESSAGE = "Search the chest nearby to retrieve your earned rewards!";
+	private static final Pattern COLOSSEUM_REWARD_GP_PATTERN = Pattern.compile("\\d[\\d,]* GP");
 
 	private InfernoTrackerPanel panel;
 	private NavigationButton navButton;
@@ -53,6 +59,7 @@ public class InfernoTrackerPlugin extends Plugin
 	private Activity currentActivity;
 	private int infernoWave = 0;
 	private int colosseumWave = 0;
+	private int pendingColosseumRewardWave = 0;
 
 	@Inject
 	private ClientToolbar clientToolbar;
@@ -121,7 +128,15 @@ public class InfernoTrackerPlugin extends Plugin
 		if (inColosseum && message.contains(COLOSSEUM_COMPLETION_MESSAGE))
 		{
 			panel.addAttempt(Activity.COLOSSEUM, Result.COMPLETION, COLOSSEUM_COMPLETION_WAVE);
-			colosseumWave = 0;
+			currentActivity = Activity.COLOSSEUM;
+			colosseumWave = COLOSSEUM_COMPLETION_WAVE;
+			pendingColosseumRewardWave = COLOSSEUM_COMPLETION_WAVE;
+			return;
+		}
+
+		if (inColosseum && message.contains(COLOSSEUM_REWARD_MESSAGE))
+		{
+			pendingColosseumRewardWave = colosseumWave;
 			return;
 		}
 
@@ -130,6 +145,7 @@ public class InfernoTrackerPlugin extends Plugin
 			currentActivity = null;
 			infernoWave = 0;
 			colosseumWave = 0;
+			pendingColosseumRewardWave = 0;
 			return;
 		}
 
@@ -175,7 +191,32 @@ public class InfernoTrackerPlugin extends Plugin
 			panel.addAttempt(Activity.COLOSSEUM, Result.DEATH, colosseumWave);
 			currentActivity = null;
 			colosseumWave = 0;
+			pendingColosseumRewardWave = 0;
 		}
+	}
+
+	@Subscribe
+	public void onClientTick(ClientTick event)
+	{
+		if (pendingColosseumRewardWave <= 0 || !isInColosseum())
+		{
+			return;
+		}
+
+		Widget gpWidget = client.getWidget(COLOSSEUM_REWARD_WIDGET_GROUP, COLOSSEUM_REWARD_GP_WIDGET_CHILD);
+		if (gpWidget == null || gpWidget.isHidden())
+		{
+			return;
+		}
+
+		String gpText = gpWidget.getText();
+		if (gpText == null || !COLOSSEUM_REWARD_GP_PATTERN.matcher(gpText).matches())
+		{
+			return;
+		}
+
+		panel.addColosseumReward(pendingColosseumRewardWave, gpText);
+		pendingColosseumRewardWave = 0;
 	}
 
 	private boolean isInInferno()
